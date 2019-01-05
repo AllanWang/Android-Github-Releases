@@ -1,0 +1,38 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+    repositories {
+        google()
+        jcenter()
+        maven { url "https://plugins.gradle.org/m2/" }
+        maven { url "https://jitpack.io" }
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:$android_gradle_version"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath "com.diffplug.spotless:spotless-plugin-gradle:$spotless_version"
+        classpath "gradle.plugin.com.gladed.gradle.androidgitversion:gradle-android-git-version:$git_plugin_version"
+        classpath "ca.allanwang:kau:$kau_version"
+
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+apply plugin: "ca.allanwang.kau"
+
+subprojects {
+    apply plugin: 'com.gladed.androidgitversion'
+    apply from: '../spotless.gradle'
+
+    repositories {
+        google()
+        jcenter()
+        maven { url "https://jitpack.io" }
+    }
+}
+
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
