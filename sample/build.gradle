@@ -1,17 +1,15 @@
 apply plugin: 'com.android.application'
-
 apply plugin: 'kotlin-android'
-
 apply plugin: 'kotlin-android-extensions'
 
 android {
-    compileSdkVersion 28
+    compileSdkVersion compile_sdk_version as Integer
     defaultConfig {
-        applicationId "ca.allanwang.github.releases"
-        minSdkVersion 14
-        targetSdkVersion 28
-        versionCode 1
-        versionName "1.0"
+        applicationId "ca.allanwang.github.releases.sample"
+        minSdkVersion min_sdk_version as Integer
+        targetSdkVersion compile_sdk_version as Integer
+        versionName androidGitVersion.name()
+        versionCode androidGitVersion.code()
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -23,6 +21,7 @@ android {
     packagingOptions {
         pickFirst 'META-INF/core_release.kotlin_module'
         pickFirst 'META-INF/library_release.kotlin_module'
+        pickFirst 'META-INF/retrofit.kotlin_module'
     }
 
     sourceSets {
@@ -46,10 +45,8 @@ android {
 }
 
 dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
-    implementation"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    implementation 'com.android.support:appcompat-v7:28.0.0'
-    testImplementation 'junit:junit:4.12'
-    androidTestImplementation 'com.android.support.test:runner:1.0.2'
-    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+    implementation project(':library')
+
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation "ca.allanwang.kau:core:$kau_version"
 }

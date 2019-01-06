@@ -1,3 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">library</string>
+    <string name="github_release_download_title" tools:ignore="ExtraTranslation">Downloading %s</string>
 </resources>
