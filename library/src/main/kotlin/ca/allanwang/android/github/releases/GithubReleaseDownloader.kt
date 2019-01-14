@@ -1,6 +1,5 @@
 package ca.allanwang.android.github.releases
 
-import android.Manifest
 import android.app.DownloadManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -8,10 +7,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.provider.Settings
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -58,26 +55,14 @@ abstract class GithubReleaseDownloader(
 
     val context: Context = context.applicationContext
 
-    open val packageName: String = context.packageName
-
     /**
      * Channel id for all notifications
      */
     open val notificationChannelId: String = "github.release_${context.packageName}"
 
-    init {
-        logd { "Initialized GithubReleaseDownloader for package $packageName" }
-    }
-
     override val logTag = "GithubReleaseDownloader"
 
     private var receiver: GithubReleaseReceiver? = null
-
-    private fun getDownloadManager(): DownloadManager? =
-        context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
-
-    private fun getNotificationManager(): NotificationManager? =
-        context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
 
     /**
      * Call when downloader should start checking for new assets
@@ -101,15 +86,14 @@ abstract class GithubReleaseDownloader(
 
             setupNotificationChannel()
 
-            val file = getFileLocation(asset)
+            val file = getFileLocation(asset)?.absoluteFile
 
             if (file != null && file.isFile && file.length() > 0) {
                 logd { "File already downloaded for ${asset.name}" }
-                onDownloadComplete(asset, Uri.fromFile(file))
+                onDownloadComplete(asset, file)
+            } else {
+                download(asset, if (file != null) Uri.fromFile(file) else null)
             }
-
-            download(asset, if (file != null) Uri.fromFile(file) else null)
-
         }
     }
 
@@ -131,7 +115,7 @@ abstract class GithubReleaseDownloader(
      */
     open fun setupNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val notificationManager = getNotificationManager() ?: return
+        val notificationManager = context.notificationManager ?: return
         val channel = NotificationChannel(
             notificationChannelId,
             context.getString(R.string.github_release_channel_title),
@@ -175,20 +159,21 @@ abstract class GithubReleaseDownloader(
      */
     open fun download(asset: GithubAsset, destinationUri: Uri?) {
         logd { "Downloading asset ${asset.name}" }
-        val downloader = getDownloadManager()
+        val downloader = context.downloadManager
         if (downloader != null) {
             val request = createDownloadAsset(asset, destinationUri)
             val id = downloader.enqueue(request)
             receiver = GithubReleaseReceiver.listen(context, id = id, debug = debug) {
                 val downloadUri = downloader.getUriForDownloadedFile(id) ?: return@listen
-                onDownloadComplete(asset, downloadUri)
+                logd { "Downloaded $downloadUri" }
+                onDownloadComplete(asset, File(downloadUri.path))
             }
         } else {
             logi { "No download service found" }
-            val manager = getNotificationManager()
+            val manager = context.notificationManager
                 ?: return loge { "No notification manager found" }
             val notifBuilder = createRedirectNotification(asset)
-            manager.notify(notificationChannelId, asset.id, notifBuilder.build())
+            manager.notify(asset.id, notifBuilder.build())
         }
     }
 
@@ -207,8 +192,6 @@ abstract class GithubReleaseDownloader(
         }.apply {
             setSmallIcon(R.drawable.ic_update_white_24dp)
             setOnlyAlertOnce(true)
-            setAutoCancel(false)
-            setOngoing(true)
         }.apply(builder)
 
     /**
@@ -241,45 +224,25 @@ abstract class GithubReleaseDownloader(
         }
 
     /**
-     * Creates an install notification. At this point, the file is completely downloaded at the [uri].
+     * Creates an install notification. At this point, the file is completely downloaded at the [file].
      * Called from [onDownloadComplete].
      * By default, if the app can install apks, it will prompt an installation.
      * Otherwise, it will open the file.
      */
-    open fun createInstallNotification(asset: GithubAsset, uri: Uri): Notification.Builder =
+    open fun createInstallNotification(notifId: Int, asset: GithubAsset, file: File): Notification.Builder =
         buildNotif {
             setContentTitle(context.getString(R.string.github_release_downloaded_title, asset.name))
             setContentText(context.getString(R.string.github_release_downloaded_desc))
-            val pendingIntent = PendingIntent.getActivity(
+            // Will be disabled by installer receiver
+            setOngoing(true)
+            val pendingIntent = PendingIntent.getBroadcast(
                 context,
-                0,
-                getInstallerIntent(uri),
+                8,
+                GithubInstallerReceiver.getIntent(context, notifId, file, debug),
                 0
             )
             setContentIntent(pendingIntent)
         }
-
-    // TODO update intents
-    // Log if android o and missing permission
-    // Default to opening file
-    private fun getInstallerIntent(uri: Uri): Intent {
-        val packageManager = context.packageManager
-
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-            && Manifest.permission.REQUEST_INSTALL_PACKAGES in packageManager.getPackageInfo(
-                packageName,
-                PackageManager.GET_PERMISSIONS
-            ).requestedPermissions
-            && !packageManager.canRequestPackageInstalls()
-        )
-            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                data = Uri.parse("package:$packageName")
-            }
-        else
-            Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-                data = contentUri(File(uri.path))
-            }
-    }
 
     fun fileUri(file: File): Uri = Uri.fromFile(file)
 
@@ -290,11 +253,12 @@ abstract class GithubReleaseDownloader(
      * Handles a completed download request.
      * By default, launches a notification to prompt an apk install
      */
-    open fun onDownloadComplete(asset: GithubAsset, uri: Uri) {
+    open fun onDownloadComplete(asset: GithubAsset, file: File) {
         logd { "Downloaded asset ${asset.name}" }
-        val manager = getNotificationManager()
+        val manager = context.notificationManager
             ?: return loge { "No notification manager found" }
-        val notifBuilder = createInstallNotification(asset, uri)
-        manager.notify(notificationChannelId, asset.id, notifBuilder.build())
+        val notifId = asset.id
+        val notifBuilder = createInstallNotification(notifId, asset, file)
+        manager.notify(notifId, notifBuilder.build())
     }
 }

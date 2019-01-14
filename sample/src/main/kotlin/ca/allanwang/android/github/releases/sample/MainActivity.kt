@@ -23,6 +23,8 @@ class MainActivity : KauBaseActivity() {
                     requestDownload()
             }
         }
+
+        main_button.performClick()
     }
 
     private fun warn(message: String) {
