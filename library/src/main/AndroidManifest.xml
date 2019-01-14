@@ -14,7 +14,7 @@
         <receiver
             android:name=".GithubInstallerReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="ca.allanwang.android.github.releases.INSTALL" />
             </intent-filter>
