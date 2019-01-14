@@ -195,6 +195,8 @@ abstract class GithubReleaseDownloader(
     /**
      * Base for all notifications.
      * Override to set your own icon and details
+     *
+     * TODO delete extra attributes (like ongoing)
      */
     open fun buildNotif(builder: Notification.Builder.() -> Unit): Notification.Builder =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
