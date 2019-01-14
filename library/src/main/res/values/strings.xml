@@ -1,4 +1,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">library</string>
+    <string name="github_release_file_provider_authority" translatable="false">ca.allanwang.android.github.releases.provider</string>
+    <string name="github_release_channel_title" tools:ignore="ExtraTranslation">Github Release Downloads</string>
     <string name="github_release_download_title" tools:ignore="ExtraTranslation">Downloading %s</string>
+    <string name="github_release_downloaded_title" tools:ignore="ExtraTranslation">Downloaded %s</string>
+    <string name="github_release_downloaded_desc" tools:ignore="ExtraTranslation">Click to install</string>
 </resources>
